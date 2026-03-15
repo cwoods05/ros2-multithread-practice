@@ -6,15 +6,39 @@ namespace multithread
   : rclcpp::Node(util::PUB_NODE_NAME, rclcpp::NodeOptions().use_intra_process_comms(false))
   , lg_{this->get_logger()}
   , count_{0}
+  , timer_period_{std::chrono::milliseconds(1000)}
   {
-    pub_ = this->create_publisher<std_msgs::msg::String>(util::TOPIC_NAME, 1);
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
+    pub_ = this->create_publisher<std_msgs::msg::String>(util::TOPIC_NAME, 10);
+    pub2_ = this->create_publisher<std_msgs::msg::String>(std::string(util::TOPIC_NAME) + "_backup", 10);
+
+    rate_service_ = this->create_service<std_srvs::srv::SetBool>(
+      "set_publish_rate",
+      std::bind(&PubNode::onRateChange, this, std::placeholders::_1, std::placeholders::_2)
+    );
+
+    timer_ = this->create_wall_timer(timer_period_,
       [this]() { this->timerCB(); }
     );
+
+    RCLCPP_INFO(lg_, "PubNode initialized with %ld ms timer", timer_period_.count());
   }
 
-  PubNode::~PubNode()
+  PubNode::~PubNode() = default;
+
+  void PubNode::onRateChange(const std_srvs::srv::SetBool::Request::SharedPtr req,
+                             std_srvs::srv::SetBool::Response::SharedPtr res)
   {
+    if (req->data) {
+      timer_period_ = std::chrono::milliseconds(250);
+      res->message = "Switched to fast mode (250ms)";
+    } else {
+      timer_period_ = std::chrono::milliseconds(1000);
+      res->message = "Switched to normal mode (1000ms)";
+    }
+    timer_->cancel();
+    timer_ = this->create_wall_timer(timer_period_, [this]() { this->timerCB(); });
+    res->success = true;
+    RCLCPP_INFO(lg_, "%s (period = %ldms)", res->message.c_str(), timer_period_.count());
   }
 
   void PubNode::timerCB()
@@ -22,13 +46,14 @@ namespace multithread
     auto msg = std_msgs::msg::String();
     msg.data = "Hello World! " + std::to_string(this->count_++);
 
-    // Extract current thread
     auto string_thread_id = std::to_string(std::hash<std::thread::id>()(std::this_thread::get_id()));
-
-    // Prep display message
-    RCLCPP_INFO_STREAM(this->lg_, "THREAD " << string_thread_id << " has spoken '" << msg.data.c_str() << "'");
+    RCLCPP_INFO_STREAM(lg_, "THREAD " << string_thread_id << " has spoken '" << msg.data << "'");
 
     this->pub_->publish(msg);
+
+    auto msg2 = std_msgs::msg::String();
+    msg2.data = "[aux] " + msg.data;
+    this->pub2_->publish(msg2);
   }
 
   Sub2Node::Sub2Node()
@@ -110,8 +135,17 @@ namespace multithread
   void Sub2Node::subCB(const std_msgs::msg::String::ConstSharedPtr msg)
   {
     auto string_thread_id = std::to_string(std::hash<std::thread::id>()(std::this_thread::get_id()));
+    auto now = this->now();
+    if (received_count_ > 0) {
+      auto dt = now - last_msg_time_;
+      double interval_ms = dt.seconds() * 1000.0;
+      RCLCPP_INFO(lg_, "Received msg %lu in %.2f ms", received_count_ + 1, interval_ms);
+    } else {
+      RCLCPP_INFO(lg_, "Received first message");
+    }
+    last_msg_time_ = now;
+    received_count_++;
 
-    // Prep display message
-    RCLCPP_INFO_STREAM(lg_, "THREAD " << string_thread_id << " => Heard '" << msg->data.c_str() << "'");
+    RCLCPP_INFO_STREAM(lg_, "THREAD " << string_thread_id << " => Heard '" << msg->data << "'");
   }
 } // namespace multithread

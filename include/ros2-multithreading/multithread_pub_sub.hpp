@@ -7,6 +7,7 @@
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 
 // STL
 #include <string>
@@ -22,12 +23,17 @@ namespace multithread
 
   private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub2_;
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr rate_service_;
     rclcpp::Logger lg_;
 
     int count_;
+    std::chrono::milliseconds timer_period_;
 
     void timerCB();
+    void onRateChange(const std_srvs::srv::SetBool::Request::SharedPtr req,
+                      std_srvs::srv::SetBool::Response::SharedPtr res);
   };
 
   class Sub2Node : public rclcpp_lifecycle::LifecycleNode
@@ -73,6 +79,9 @@ namespace multithread
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub1_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub2_;
     rclcpp::Logger lg_;
+
+    rclcpp::Time last_msg_time_;
+    size_t received_count_ = 0;
 
     void subCB(const std_msgs::msg::String::ConstSharedPtr msg);
   };

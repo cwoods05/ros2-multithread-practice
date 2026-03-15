@@ -11,6 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 # BUILD
 include_directories(
@@ -23,6 +24,7 @@ set(dependencies
   rclcpp
   rclcpp_lifecycle
   std_msgs
+  std_srvs
 )
 
 add_library(${library_name} SHARED
