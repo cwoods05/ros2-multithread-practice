@@ -60,6 +60,7 @@ namespace multithread
   : rclcpp_lifecycle::LifecycleNode(util::SUB_NODE_NAME, rclcpp::NodeOptions().use_intra_process_comms(false))
   , lg_{this->get_logger()}
   {
+    this->declare_parameter<bool>("enable_metrics", true);
   }
 
   Sub2Node::~Sub2Node()
@@ -74,6 +75,15 @@ namespace multithread
      */
     callback_group_sub1 = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     callback_group_sub2 = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+    enable_metrics_ = this->get_parameter("enable_metrics").as_bool();
+    if (enable_metrics_) {
+      latency_pub_ = this->create_publisher<std_msgs::msg::Float64>(
+        std::string(util::TOPIC_NAME) + "_latency", 10);
+    }
+
+    RCLCPP_INFO(lg_, "Sub2Node configured (metrics %s)",
+      enable_metrics_ ? "enabled" : "disabled");
 
     return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
   }
@@ -118,6 +128,7 @@ namespace multithread
   {
     sub1_.reset();
     sub2_.reset();
+    latency_pub_.reset();
     return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
   }
 
@@ -140,6 +151,12 @@ namespace multithread
       auto dt = now - last_msg_time_;
       double interval_ms = dt.seconds() * 1000.0;
       RCLCPP_INFO(lg_, "Received msg %lu in %.2f ms", received_count_ + 1, interval_ms);
+
+      if (enable_metrics_ && latency_pub_) {
+        std_msgs::msg::Float64 latency_msg;
+        latency_msg.data = interval_ms;
+        latency_pub_->publish(latency_msg);
+      }
     } else {
       RCLCPP_INFO(lg_, "Received first message");
     }

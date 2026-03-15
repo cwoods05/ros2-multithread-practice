@@ -7,6 +7,7 @@
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 
 // STL
@@ -78,10 +79,12 @@ namespace multithread
     rclcpp::CallbackGroup::SharedPtr callback_group_sub2;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub1_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub2_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr latency_pub_;
     rclcpp::Logger lg_;
 
     rclcpp::Time last_msg_time_;
     size_t received_count_ = 0;
+    bool enable_metrics_ = true;
 
     void subCB(const std_msgs::msg::String::ConstSharedPtr msg);
   };
